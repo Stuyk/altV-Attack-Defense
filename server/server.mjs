@@ -15,19 +15,26 @@ import * as utility from './utility.mjs';
  * AutoShuffle teams after each round.
  */
 
-const modelsToUse = ['mp_m_famdd_01', 'g_m_y_ballasout_01'];
+const modelsToUse = ['cs_zimbor', 'a_m_y_beachvesp_01'];
 const redTeam = [];
 const blueTeam = [];
-const capturePoint = { x: -585.9033, y: -1600.66, z: 27.005 };
-const unassignedPlayers = [];
-const blueTeamSpawn = {x: -586.86, y: -1665.01, z: 19.355};
-const redTeamSpawn = {x: -646.25, y: -1721.92, z: 24.511};
+const capturePoint = { x: 135.4681396484375, y: -3092.4130859375, z: 5.892333984375 };
+const blueTeamSpawn = { x: 134.36044311523438, y: -2992.773681640625, z: 7.021240234375 }
+const redTeamSpawn = { x: 284.05712890625, y: -3160.918701171875, z: 5.791259765625 };
+var unassignedPlayers = [];
+var captureEnterTime = undefined;
+var roundStartTime = Date.now();
+var roundTimeModifier = 300000; // 5 Minutes
 
-const captureColshape = new alt.ColshapeCylinder(capturePoint.x, capturePoint.y, capturePoint.z, 2, 2);
+new alt.ColshapeCylinder(capturePoint.x, capturePoint.y, capturePoint.z - 1, 2, 5);
 
 alt.on('playerConnect', (player) => {
+	player.setDateTime(1, 1, 1, 12, 0, 0);
+	player.setWeather(8);
 	player.model = 'mp_m_freemode_01';
 	alt.emitClient(player, 'loadModels', modelsToUse);
+	alt.emitClient(player, 'showCapturePoint', capturePoint);
+	alt.emitClient(player, 'setRoundTime', roundStartTime, roundTimeModifier);
 	addToTeam(player);
 });
 
@@ -49,8 +56,47 @@ alt.on('playerDamage', (victim, attacker, damage, weapon) => {
 	}
 });
 
+alt.on('entityEnterColshape', (colshape, entity) => {
+	if (roundStartTime === undefined)
+		return;
+	
+	if (entity.team !== 'red')
+		return;
+
+	if (captureEnterTime !== undefined)
+		return;
+
+	captureEnterTime = Date.now();
+	chat.broadcast(`{FF0000}${entity.name}{FFFFFF} is capturing the point.`)
+});
+
+alt.on('entityLeaveColshape', (colshape, entity) => {
+	if (roundStartTime === undefined)
+		return;
+	
+	if (entity.team !== 'red')
+		return;
+
+	var isSomeoneInsideStill = false;
+
+	redTeam.forEach((teamMember) => {
+		if (colshape.isEntityIn(teamMember)) {
+			isSomeoneInsideStill = true;
+		}
+	});
+
+	// Reset capture time.
+	if (!isSomeoneInsideStill) {
+		captureEnterTime = undefined;	
+		chat.broadcast(`{FF0000}Nobody; {FFFFFF}is currently capturing the point.`);
+		alt.emitClient(null, 'playAudio', 'capturefailed');
+	}
+});
+
 // load weapons for a player
 alt.onClient('loadWeapons', (player, weaponHashes) => {
+	player.removeAllWeapons();
+	
 	var parsedArray = JSON.parse(weaponHashes);
 	
 	if (!Array.isArray(parsedArray))
@@ -100,6 +146,10 @@ function addToTeam(player) {
  * @param player 
  */
 function removeFromTeam(player) {
+	if (player.pos !== undefined) {
+		player.pos = new alt.Vector3(player.pos.x, player.pos.y, 0);
+	}
+	
 	if (redTeam.includes(x => x === player)) {
 		let index = redTeam.findIndex(x => x === player);
 
@@ -123,6 +173,7 @@ function handleRedSpawn(player) {
 	var pos = utility.RandomPosAround(redTeamSpawn, 10);
 	player.spawn(pos.x, pos.y, pos.z, 100);
 	player.model = modelsToUse[1]; // Ballas Model
+	player.health = 200;
 	alt.emitClient(player, 'chooseWeapons');
 }
 
@@ -130,6 +181,7 @@ function handleBlueSpawn(player) {
 	var pos = utility.RandomPosAround(blueTeamSpawn, 10);
 	player.spawn(pos.x, pos.y, pos.z, 100);
 	player.model = modelsToUse[0]; // Grove Model
+	player.health = 200;
 	alt.emitClient(player, 'chooseWeapons');
 }
 
@@ -157,11 +209,81 @@ function updateTeams() {
 	}
 }
 
-chat.registerCmd('pos', (player) => {
-	console.log(player.pos);
+function resetRound() {
+	roundStartTime = undefined;
+	alt.emitClient(null, 'setRoundTime', undefined);
+	alt.emitClient(null, 'updateCaptureTime', undefined);
+	alt.emitClient(null, 'disableControls', true);
+	alt.emitClient(null, 'setupCamera', capturePoint);
+	captureEnterTime = undefined;
+	
+	alt.Player.all.forEach((target) => {
+		removeFromTeam(target);
+	});
+
+	// Clear red team.
+	while(redTeam.length >= 1) {
+		removeFromTeam(redTeam.pop());
+	}
+
+	// Clear blue team.
+	while(blueTeam.length >= 1) {
+		removeFromTeam(blueTeam.pop());
+	}
+
+	// Round Reset
+	setTimeout(() => {
+		roundStartTime = Date.now();
+		alt.emitClient(null, 'setRoundTime', roundStartTime, roundTimeModifier);
+		alt.Player.all.forEach((target) => {
+			addToTeam(target);
+		});
+
+		unassignedPlayers = [];
+	}, 5000);
+}
+
+chat.registerCmd('cap', (player) => {
+	player.pos = capturePoint;
 });
 
-chat.registerCmd('veh', (player, args) => {
-	new alt.Vehicle(args[0], player.pos.x, player.pos.y, player.pos.z, 0, 0, 0);
-});
+// Interval for Capturing
+setInterval(() => {
+	if (roundStartTime === undefined)
+		return;
+	
+	if (captureEnterTime === undefined) {
+		alt.emitClient(null, 'updateCaptureTime', undefined);
+		return;
+	}
 
+	if (captureEnterTime + 15000 > Date.now()) {
+		alt.emitClient(null, 'updateCaptureTime', captureEnterTime + 15000);
+		return;
+	}
+
+	resetRound();
+	alt.emitClient(null, 'playAudio', 'redwins');
+	chat.broadcast(`Red team has won the round.`);
+}, 500);
+
+// Weather / Date Updater
+setInterval(() => {
+	alt.Player.all.forEach((player) => {
+		player.setDateTime(1, 1, 1, 12, 0, 0);
+		player.setWeather(8);
+	});
+}, 60000);
+
+// Round Timer
+setInterval(() => {
+	if (roundStartTime === undefined)
+		return;
+
+	if (Date.now() < roundStartTime + roundTimeModifier)
+		return;
+
+	resetRound();
+	chat.broadcast(`Blue team has won the round.`);
+	alt.emitClient(null, 'playAudio', 'bluewins');
+}, 5000);
