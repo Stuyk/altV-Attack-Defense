@@ -29,6 +29,7 @@ var roundTimeModifier = 300000; // 5 Minutes
 new alt.ColshapeCylinder(capturePoint.x, capturePoint.y, capturePoint.z - 1, 2, 5);
 
 alt.on('playerConnect', (player) => {
+	chat.broadcast(`${player.name} has joined the server.`);
 	player.setDateTime(1, 1, 1, 12, 0, 0);
 	player.setWeather(8);
 	player.model = 'mp_m_freemode_01';

@@ -9,6 +9,7 @@ var roundTime = undefined;
 var roundTimeModifier = 0;
 var captureTime = undefined;
 var specialCam = undefined;
+var hideHud = false;
 
 // Audio Booleans
 var captureAudioPlayed = false;
@@ -44,7 +45,6 @@ alt.on('update', () => {
 	// Restore Stamina
 	native.restorePlayerStamina(alt.Player.local.scriptID, 100);
 
-
 	// Draw a marker at the position of the capture point.
 	if (capturePointCoords !== undefined) {
 		drawMarker(1, capturePointCoords, 2, 2, 0.5, 0, 128, 255, 100);
@@ -58,12 +58,12 @@ alt.on('update', () => {
 	}
 
 	// Display Round Time to the user.
-	if (roundTime !== undefined) {
+	if (roundTime !== undefined && !hideHud) {
 		drawText(`Time Left: ${millisToMinutesAndSeconds((roundTime + roundTimeModifier) - Date.now())}`, 0.5, 0.01, 0.5, 255, 255, 255, 100);
 	}
 
 	// Display Capture Time to the user
-	if (captureTime !== undefined) {
+	if (captureTime !== undefined && !hideHud) {
 		drawText(`~r~Time Until Captured ~y~${millisToMinutesAndSeconds(captureTime - Date.now())}s`, 0.5, 0.05, 0.5, 255, 255, 255, 100);
 	}
 });
@@ -87,6 +87,9 @@ function chooseWeapons() {
 	setupCamera(capturePointCoords);
 	
 	if (chooseWeaponView === undefined || chooseWeaponView === null) {
+		native.transitionToBlurred(1000);
+		native.displayRadar(false);
+
 		chooseWeaponView = new alt.WebView('http://resources/attack-defend/client/html/index.html');
 		chooseWeaponView.focus();
 		chooseWeaponView.on('loadWeapons', selectWeapons);
@@ -118,6 +121,10 @@ function selectWeapons(weaponHashes) {
 	chooseWeaponView = undefined;
 	disablePlayerControls(false);
 	clearCamera();
+
+	native.transitionFromBlurred(1000)
+	native.displayRadar(true);
+	hideHud = false;
 }
 
 // Disable the player's controls or enable.
@@ -247,4 +254,8 @@ function millisToMinutesAndSeconds(millis) {
 	var minutes = Math.floor(millis / 60000);
 	var seconds = ((millis % 60000) / 1000).toFixed(0);
 	return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
+}
+
+function vehicleDoesSomething() {
+	
 }
