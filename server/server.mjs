@@ -62,6 +62,13 @@ alt.on('playerDeath', (victim, attacker, weapon) => {
 	}
 });
 
+alt.on('chatIntercept', (player, msg) => {
+	if(player.team === 'red')
+		chat.broadcast(`{FF0000}${player.name} {FFFFFF}: ${msg}`);
+	else 
+		chat.broadcast(`{0000FF}${player.name} {FFFFFF}: ${msg}`);
+});
+
 // ushort actualDamage = 65536 - damage;
 alt.on('playerDamage', (victim, attacker, damage, weapon) => {
 	const actualDamage = 65536 - damage;
