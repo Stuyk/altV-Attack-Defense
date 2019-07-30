@@ -15,7 +15,7 @@ import * as utility from './utility.mjs';
  * AutoShuffle teams after each round.
  */
 
-const modelsToUse = ['cs_zimbor', 'a_m_y_beachvesp_01'];
+const modelsToUse = ['mp_m_freemode_01', 'mp_m_freemode_01'];
 const redTeam = [];
 const blueTeam = [];
 const capturePoint = { x: 135.4681396484375, y: -3092.4130859375, z: 5.892333984375 };
@@ -43,13 +43,31 @@ alt.on('playerDisconnect', (player) => {
 });
 
 alt.on('playerDeath', (victim, attacker, weapon) => {
+	alt.emitClient(attacker, 'playAudio', 'playerkill');
 	removeFromTeam(victim);
 	unassignedPlayers.push(victim);
+	alt.emitClient(victim, 'setupCamera', capturePoint);
+
+	// Red Team Dies
+	if (redTeam.length <= 0) {
+		resetRound();
+		chat.broadcast(`Blue team has won the round.`);
+		alt.emitClient(null, 'playAudio', 'bluewins');
+	// Blue Team Dies
+	} else if(blueTeam.length <= 0) {
+		resetRound();
+		chat.broadcast(`Red team has won the round.`);
+		alt.emitClient(null, 'playAudio', 'redwins');
+	}
 });
 
 // ushort actualDamage = 65536 - damage;
 alt.on('playerDamage', (victim, attacker, damage, weapon) => {
 	const actualDamage = 65536 - damage;
+	if (attacker.team === null || attacker.team === undefined) {
+		return;
+	}
+	
 	if (victim.team === attacker.team) {
 		victim.health += actualDamage;
 		return;
@@ -116,6 +134,7 @@ function addToTeam(player) {
 		player.team = 'red';
 		redTeam.push(player);
 		handleRedSpawn(player);
+		alt.emitClient(player, 'setRedClothes');
 
 		redTeam.forEach((redMember) => {
 			if (redMember === player) {
@@ -129,6 +148,7 @@ function addToTeam(player) {
 		player.team = 'blue';
 		blueTeam.push(player);
 		handleBlueSpawn(player);
+		alt.emitClient(player, 'setBlueClothes');
 
 		blueTeam.forEach((blueMember) => {
 			if (blueMember === player) {
@@ -147,19 +167,24 @@ function addToTeam(player) {
  */
 function removeFromTeam(player) {
 	if (player.pos !== undefined) {
-		player.pos = new alt.Vector3(player.pos.x, player.pos.y, 0);
+		if (player.team === 'red') {
+			var pos = utility.RandomPosAround(redTeamSpawn, 3);
+			player.pos = pos;
+		} else {
+			var pos = utility.RandomPosAround(blueTeamSpawn, 3);
+			player.pos = pos;
+		}
 	}
 	
-	if (redTeam.includes(x => x === player)) {
+	if (player.team === 'red') {
 		let index = redTeam.findIndex(x => x === player);
-
 		if (index !== -1) {
 			redTeam.splice(index, 1);
 			updateTeams();
 		}
 	}
 
-	if (blueTeam.includes(x => x === player)) {
+	if (player.team === 'blue') {
 		let index = blueTeam.findIndex(x => x === player);
 
 		if (index !== -1) {
@@ -170,7 +195,7 @@ function removeFromTeam(player) {
 }
 
 function handleRedSpawn(player) {
-	var pos = utility.RandomPosAround(redTeamSpawn, 10);
+	var pos = utility.RandomPosAround(redTeamSpawn, 5);
 	player.spawn(pos.x, pos.y, pos.z, 100);
 	player.model = modelsToUse[1]; // Ballas Model
 	player.health = 200;
@@ -178,7 +203,7 @@ function handleRedSpawn(player) {
 }
 
 function handleBlueSpawn(player) {
-	var pos = utility.RandomPosAround(blueTeamSpawn, 10);
+	var pos = utility.RandomPosAround(blueTeamSpawn, 5);
 	player.spawn(pos.x, pos.y, pos.z, 100);
 	player.model = modelsToUse[0]; // Grove Model
 	player.health = 200;

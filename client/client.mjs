@@ -28,11 +28,16 @@ alt.onServer('setRoundTime', setRoundTime);
 alt.onServer('updateCaptureTime', currentCaptureTime);
 alt.onServer('playAudio', playAudio);
 alt.onServer('setupCamera', setupCamera);
+alt.onServer('setBlueClothes', setBlueClothes);
+alt.onServer('setRedClothes', setRedClothes);
 
 alt.on('disconnect', () => {
 	if (capturePointBlip !== undefined) {
 		capturePointBlip.destroy();
 	}
+
+	native.destroyAllCams(false);
+	native.renderScriptCams(false, false, 0, false, 0);
 });
 
 alt.on('update', () => {
@@ -79,6 +84,7 @@ function loadModels(modelNames) {
 
 function chooseWeapons() {
 	disablePlayerControls(true);
+	setupCamera(capturePointCoords);
 	
 	if (chooseWeaponView === undefined || chooseWeaponView === null) {
 		chooseWeaponView = new alt.WebView('http://resources/attack-defend/client/html/index.html');
@@ -86,8 +92,6 @@ function chooseWeapons() {
 		chooseWeaponView.on('loadWeapons', selectWeapons);
 		alt.showCursor(true);
 	}
-
-	native.setRunSprintMultiplierForPlayer(alt.Player.local.scriptID, 1.49);
 }
 
 // Display a blip for the capture point.
@@ -150,6 +154,9 @@ function currentCaptureTime(timeInMS) {
 }
 
 function setupCamera(camPos) {
+	if (camPos === undefined)
+		return;
+	
 	specialCam = native.createCamWithParams("DEFAULT_SCRIPTED_CAMERA", camPos.x + 3, camPos.y + 3, camPos.z + 5, 0, 0, 0, 90, true, 0);
 	native.pointCamAtCoord(specialCam, camPos.x, camPos.y, camPos.z)
 	native.renderScriptCams(true, false, 0, true, false);
@@ -163,6 +170,28 @@ function clearCamera() {
 
 function playAudio(audioName) {
 	audioPlayer.emit('playAudio', audioName);
+}
+
+function setBlueClothes() {
+	native.setPedComponentVariation(alt.Player.local.scriptID, 0, 0, 0, 0); // Face
+	native.setPedComponentVariation(alt.Player.local.scriptID, 1, 21, 0, 0); // Head
+	native.setPedComponentVariation(alt.Player.local.scriptID, 2, 0, 0, 0); // Hair
+	native.setPedComponentVariation(alt.Player.local.scriptID, 3, 1, 0, 0); // Torso
+	native.setPedComponentVariation(alt.Player.local.scriptID, 4, 13, 0, 0); // Legs
+	native.setPedComponentVariation(alt.Player.local.scriptID, 6, 1, 0, 0); // Shoes
+	native.setPedComponentVariation(alt.Player.local.scriptID, 8, 15, 0, 0); // Undershirt
+	native.setPedComponentVariation(alt.Player.local.scriptID, 11, 14, 0, 0); // Top
+}
+
+function setRedClothes() {
+	native.setPedComponentVariation(alt.Player.local.scriptID, 0, 0, 0, 0); // Face
+	native.setPedComponentVariation(alt.Player.local.scriptID, 1, 26, 0, 0); // Head
+	native.setPedComponentVariation(alt.Player.local.scriptID, 2, 0, 0, 0); // Hair
+	native.setPedComponentVariation(alt.Player.local.scriptID, 3, 1, 0, 0); // Torso
+	native.setPedComponentVariation(alt.Player.local.scriptID, 4, 13, 0, 0); // Legs
+	native.setPedComponentVariation(alt.Player.local.scriptID, 6, 1, 0, 0); // Shoes
+	native.setPedComponentVariation(alt.Player.local.scriptID, 8, 15, 0, 0); // Undershirt
+	native.setPedComponentVariation(alt.Player.local.scriptID, 11, 79, 0, 0); // Top
 }
 
 function drawMarker(type, pos, scaleX, scaleY, scaleZ, r, g, b, a) {
