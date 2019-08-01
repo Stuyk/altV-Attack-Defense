@@ -25,7 +25,7 @@ var roundTimeModifier = 300000; // 5 Minutes
 
 // Current Maps
 var captureRotation = [
-	{
+	{ // Dock Warehouse
 		capturePoint: { 
 			x: 135.4681396484375, 
 			y: -3092.4130859375, 
@@ -37,7 +37,7 @@ var captureRotation = [
 			z: 5.791259765625 
 		}
 	},
-	{
+	{ // Ship Point
 		capturePoint: {
 			x: -115.68791198730469,
 			y: -2366.32080078125,
@@ -47,6 +47,66 @@ var captureRotation = [
 			x: -280.4175720214844,
 			y: -2411.472412109375,
 			z: 5.993408203125
+		}
+	}, // Plaza
+	{
+		capturePoint: {
+			x: 180.84396362304688,
+        	y: -969.085693359375,
+        	z: 29.5662841796875
+		},
+		redTeamSpawn: {
+			x: 236.3208770751953,
+			y: -751.5560302734375,
+			z: 33.863037109375
+		}
+	},
+	{ // Bus Station
+		capturePoint: {
+			x: 471.8241882324219,
+			y: -584.3208618164062,
+			z: 27.7464599609375
+		},
+		redTeamSpawn: {
+			x: 381.6131896972656,
+			y: -753.5472412109375,
+			z: 28.5384521484375
+		}
+	},
+	{ // Air Field
+		capturePoint: {
+			x: 2135.274658203125,
+			y: 4779.25732421875,
+			z: 40.956787109375
+		},
+		redTeamSpawn: {
+			x: 2164.800048828125,
+        	y: 4725.40234375,
+        	z: 40.198486328125
+		}
+	}, // Biker Trailer Park
+	{
+		capturePoint: {
+			x: 78.73846435546875,
+			y: 3707.208740234375,
+			z: 41.07470703125
+		},
+		redTeamSpawn: {
+			x: 125.53845977783203,
+			y: 3572.808837890625,
+			z: 38.5303955078125
+		}
+	}, // Treatre
+	{
+		capturePoint: {
+			x: 686.2944946289062,
+        	y: 577.87255859375,
+        	z: 130.4461669921875
+		},
+		redTeamSpawn: {
+			x: 650.4132080078125,
+			y: 480.1450500488281,
+			z: 139.83154296875
 		}
 	}
 ];
@@ -76,7 +136,6 @@ alt.on('playerDisconnect', (player) => {
 
 // Called when a player is eliminated from the match.
 alt.on('playerDeath', (victim, attacker, weapon) => {
-	alt.emitClient(attacker, 'playAudio', 'playerkill');
 	unassignedPlayers.push(victim);
 	removeFromTeam(victim);
 
@@ -90,6 +149,10 @@ alt.on('playerDeath', (victim, attacker, weapon) => {
 		resetRound();
 		chat.broadcast(`Red team has won the round.`);
 		alt.emitClient(null, 'playAudio', 'redwins');
+	}
+
+	if (attacker !== undefined || attacker !== null) {
+		alt.emitClient(attacker, 'playAudio', 'playerkill');
 	}
 
 	alt.emitClient(victim, 'enableSpectateMode');
