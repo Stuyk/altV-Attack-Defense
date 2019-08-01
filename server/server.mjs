@@ -96,6 +96,13 @@ alt.on('playerDeath', (victim, attacker, weapon) => {
 	alt.emitClient(null, 'killFeed', victim, attacker, victim.team);
 });
 
+alt.on('chatIntercept', (player, msg) => {
+	if(player.team === 'red')
+		chat.broadcast(`{FF0000}${player.name} {FFFFFF}: ${msg}`);
+	else 
+		chat.broadcast(`{0000FF}${player.name} {FFFFFF}: ${msg}`);
+});
+
 // ushort actualDamage = 65536 - damage;
 alt.on('playerDamage', (victim, attacker, damage, weapon) => {
 	const actualDamage = 65536 - damage;
@@ -395,7 +402,6 @@ setInterval(() => {
 	chat.broadcast(`Blue team has won the round.`);
 	alt.emitClient(null, 'playAudio', 'bluewins');
 }, 5000);
-
 
 chat.registerCmd('pos', (player) => {
 	console.log(player.pos);
