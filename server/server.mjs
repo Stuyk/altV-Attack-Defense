@@ -16,38 +16,69 @@ import * as utility from './utility.mjs';
  */
 
 const modelsToUse = ['mp_m_freemode_01', 'mp_m_freemode_01'];
-const redTeam = [];
-const blueTeam = [];
-const capturePoint = { x: 135.4681396484375, y: -3092.4130859375, z: 5.892333984375 };
-const blueTeamSpawn = { x: 134.36044311523438, y: -2992.773681640625, z: 7.021240234375 }
-const redTeamSpawn = { x: 284.05712890625, y: -3160.918701171875, z: 5.791259765625 };
-var unassignedPlayers = [];
-var captureEnterTime = undefined;
-var roundStartTime = Date.now();
+const redTeam = []; // Red Team Members
+const blueTeam = []; // Blue Team Members
+var unassignedPlayers = []; // Players who die are assigned to this array.
+var captureEnterTime = undefined; // The time when the player enters the capture point.
+var roundStartTime = Date.now(); // Set the round start time; changes frequently.
 var roundTimeModifier = 300000; // 5 Minutes
 
-new alt.ColshapeCylinder(capturePoint.x, capturePoint.y, capturePoint.z - 1, 2, 5);
+// Current Maps
+var captureRotation = [
+	{
+		capturePoint: { 
+			x: 135.4681396484375, 
+			y: -3092.4130859375, 
+			z: 5.892333984375 
+		},
+		redTeamSpawn: { 
+			x: 284.05712890625, 
+			y: -3160.918701171875, 
+			z: 5.791259765625 
+		}
+	},
+	{
+		capturePoint: {
+			x: -115.68791198730469,
+			y: -2366.32080078125,
+			z: 13.778076171875 
+		},
+		redTeamSpawn: {
+			x: -280.4175720214844,
+			y: -2411.472412109375,
+			z: 5.993408203125
+		}
+	}
+];
 
+// Spawn Points and Such
+var capturePoint = captureRotation[0].capturePoint;
+var redTeamSpawn = captureRotation[0].redTeamSpawn;
+
+// Capture Point Colshape
+var capturePointShape = new alt.ColshapeCylinder(capturePoint.x, capturePoint.y, capturePoint.z - 1, 2, 5);
+
+// Called on first join.
 alt.on('playerConnect', (player) => {
 	chat.broadcast(`${player.name} has joined the server.`);
 	player.setDateTime(1, 1, 1, 12, 0, 0);
 	player.setWeather(8);
 	player.model = 'mp_m_freemode_01';
 	alt.emitClient(player, 'loadModels', modelsToUse);
-	alt.emitClient(player, 'showCapturePoint', capturePoint);
 	alt.emitClient(player, 'setRoundTime', roundStartTime, roundTimeModifier);
 	addToTeam(player);
 });
 
+// When the player leaves we remove them from the team.
 alt.on('playerDisconnect', (player) => {
 	removeFromTeam(player);
 });
 
+// Called when a player is eliminated from the match.
 alt.on('playerDeath', (victim, attacker, weapon) => {
 	alt.emitClient(attacker, 'playAudio', 'playerkill');
-	removeFromTeam(victim);
 	unassignedPlayers.push(victim);
-	alt.emitClient(victim, 'setupCamera', capturePoint);
+	removeFromTeam(victim);
 
 	// Red Team Dies
 	if (redTeam.length <= 0) {
@@ -60,6 +91,9 @@ alt.on('playerDeath', (victim, attacker, weapon) => {
 		chat.broadcast(`Red team has won the round.`);
 		alt.emitClient(null, 'playAudio', 'redwins');
 	}
+
+	alt.emitClient(victim, 'enableSpectateMode');
+	alt.emitClient(null, 'killFeed', victim, attacker, victim.team);
 });
 
 // ushort actualDamage = 65536 - damage;
@@ -69,12 +103,14 @@ alt.on('playerDamage', (victim, attacker, damage, weapon) => {
 		return;
 	}
 	
+	// Prevent team killing.
 	if (victim.team === attacker.team) {
 		victim.health += actualDamage;
 		return;
 	}
 });
 
+// Called when the player enters the capture point.
 alt.on('entityEnterColshape', (colshape, entity) => {
 	if (roundStartTime === undefined)
 		return;
@@ -89,6 +125,7 @@ alt.on('entityEnterColshape', (colshape, entity) => {
 	chat.broadcast(`{FF0000}${entity.name}{FFFFFF} is capturing the point.`)
 });
 
+// Caled when the player leaves the capture point.
 alt.on('entityLeaveColshape', (colshape, entity) => {
 	if (roundStartTime === undefined)
 		return;
@@ -131,6 +168,8 @@ alt.onClient('loadWeapons', (player, weaponHashes) => {
  * @param player 
  */
 function addToTeam(player) {
+	alt.emitClient(player, 'showCapturePoint', capturePoint);
+	
 	if (redTeam.length <= blueTeam.length) {
 		player.team = 'red';
 		redTeam.push(player);
@@ -160,6 +199,8 @@ function addToTeam(player) {
 			chat.send(blueMember, `${player.name} has joined your {0000FF}team`);
 		});
 	}
+
+	updateAlivePlayers();
 }
 
 /**
@@ -172,7 +213,7 @@ function removeFromTeam(player) {
 			var pos = utility.RandomPosAround(redTeamSpawn, 3);
 			player.pos = pos;
 		} else {
-			var pos = utility.RandomPosAround(blueTeamSpawn, 3);
+			var pos = utility.RandomPosAround(capturePoint, 3);
 			player.pos = pos;
 		}
 	}
@@ -195,6 +236,10 @@ function removeFromTeam(player) {
 	}
 }
 
+/**
+ * Called to spawn a red team member.
+ * @param player 
+ */
 function handleRedSpawn(player) {
 	var pos = utility.RandomPosAround(redTeamSpawn, 5);
 	player.spawn(pos.x, pos.y, pos.z, 100);
@@ -203,8 +248,12 @@ function handleRedSpawn(player) {
 	alt.emitClient(player, 'chooseWeapons');
 }
 
+/**
+ * Called to spawn a blue team member.
+ * @param player 
+ */
 function handleBlueSpawn(player) {
-	var pos = utility.RandomPosAround(blueTeamSpawn, 5);
+	var pos = utility.RandomPosAround(capturePoint, 5);
 	player.spawn(pos.x, pos.y, pos.z, 100);
 	player.model = modelsToUse[0]; // Grove Model
 	player.health = 200;
@@ -233,8 +282,32 @@ function updateTeams() {
 			alt.emitClient(blueMember, 'setTeamMembers', blueTeam);
 		});
 	}
+
+	unassignedPlayers.forEach((player) => {
+		if (player.team === 'red') {
+			alt.emitClient(player, 'aliveTeamMembers', redTeam, 'red');
+		} else {
+			alt.emitClient(player, 'aliveTeamMembers', blueTeam, 'blue');
+		}
+	});
+
+	updateAlivePlayers();
 }
 
+/**
+ * Update alive players with their currently available team.
+ */
+function updateAlivePlayers() {
+	blueTeam.forEach((player) => {
+		alt.emitClient(player, 'aliveTeamMembers', blueTeam, 'blue');
+	});
+
+	redTeam.forEach((player) => {
+		alt.emitClient(player, 'aliveTeamMembers', redTeam, 'red');
+	});
+}
+
+// Called to reset the round; and start a new one.
 function resetRound() {
 	roundStartTime = undefined;
 	alt.emitClient(null, 'setRoundTime', undefined);
@@ -257,6 +330,19 @@ function resetRound() {
 		removeFromTeam(blueTeam.pop());
 	}
 
+	// Change Map
+	var firstMap = captureRotation.shift();
+	captureRotation.push(firstMap);
+
+	redTeamSpawn = captureRotation[0].redTeamSpawn;
+	capturePoint = captureRotation[0].capturePoint;
+
+	capturePointShape.destroy();
+	capturePointShape = new alt.ColshapeCylinder(capturePoint.x, capturePoint.y, capturePoint.z - 1, 2, 5);
+
+	// Update Local Point
+	alt.emitClient(null, 'showCapturePoint', capturePoint);
+
 	// Round Reset
 	setTimeout(() => {
 		roundStartTime = Date.now();
@@ -268,10 +354,6 @@ function resetRound() {
 		unassignedPlayers = [];
 	}, 5000);
 }
-
-chat.registerCmd('cap', (player) => {
-	player.pos = capturePoint;
-});
 
 // Interval for Capturing
 setInterval(() => {
@@ -313,3 +395,12 @@ setInterval(() => {
 	chat.broadcast(`Blue team has won the round.`);
 	alt.emitClient(null, 'playAudio', 'bluewins');
 }, 5000);
+
+
+chat.registerCmd('pos', (player) => {
+	console.log(player.pos);
+});
+
+chat.registerCmd('veh', (player) => {
+	new alt.Vehicle('infernus', player.pos.x, player.pos.y, player.pos.z, 0, 0, 0);
+});

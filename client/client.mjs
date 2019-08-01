@@ -10,28 +10,39 @@ var roundTimeModifier = 0;
 var captureTime = undefined;
 var specialCam = undefined;
 var hideHud = false;
+var aliveTeamMembers = [];
+var aliveTeamBlips = [];
+var currentlySpectating = false;
+var killFeedList = [];
+var updatingTeamMembers = false;
+var currentTeamColor = 'red';
+
+const screenRes = native.getActiveScreenResolution(0, 0);
 
 // Audio Booleans
 var captureAudioPlayed = false;
 
+// Audio Player Webview
+// Required to focus/unfocus.
 const audioPlayer = new alt.WebView('http://resources/attack-defend/client/html/audioplayer.html');
-
 audioPlayer.focus();
 audioPlayer.unfocus();
 
-// [{"model":812467272,"coords":{"x":-589.5238037109375,"y":-1621.549560546875,"z":33.160587310791016}}]
+alt.onServer('loadModels', loadModels); // Called to load models before game join.
+alt.onServer('chooseWeapons', chooseWeapons); // Called to select weapons.
+alt.onServer('showCapturePoint', showCapturePoint); // Called to set the capture point position.
+alt.onServer('disableControls', disablePlayerControls); // Called to disable player controls.
+alt.onServer('setRoundTime', setRoundTime); // Called to set the current round time until finished.
+alt.onServer('updateCaptureTime', currentCaptureTime); // Called to update the capture time when a player is inside.
+alt.onServer('playAudio', playAudio); // Called to play an audio by name.
+alt.onServer('setupCamera', setupCamera); // Called to setup the player camera for weapon selection.
+alt.onServer('setBlueClothes', setBlueClothes); // Set the blue player team clothes.
+alt.onServer('setRedClothes', setRedClothes); // Set the red player team clothes.
+alt.onServer('aliveTeamMembers', setAliveTeamMembers); // Set the alive players for a team.
+alt.onServer('enableSpectateMode', enableSpectateMode); // Enable spectator mode.
+alt.onServer('killFeed', killFeed); // Push kills and deaths to the kill feed.
 
-alt.onServer('loadModels', loadModels);
-alt.onServer('chooseWeapons', chooseWeapons);
-alt.onServer('showCapturePoint', showCapturePoint);
-alt.onServer('disableControls', disablePlayerControls);
-alt.onServer('setRoundTime', setRoundTime);
-alt.onServer('updateCaptureTime', currentCaptureTime);
-alt.onServer('playAudio', playAudio);
-alt.onServer('setupCamera', setupCamera);
-alt.onServer('setBlueClothes', setBlueClothes);
-alt.onServer('setRedClothes', setRedClothes);
-
+// Disconnect Event
 alt.on('disconnect', () => {
 	if (capturePointBlip !== undefined) {
 		capturePointBlip.destroy();
@@ -41,6 +52,7 @@ alt.on('disconnect', () => {
 	native.renderScriptCams(false, false, 0, false, 0);
 });
 
+// Constantly Called Drawables and Functions.
 alt.on('update', () => {
 	// Restore Stamina
 	native.restorePlayerStamina(alt.Player.local.scriptID, 100);
@@ -66,8 +78,66 @@ alt.on('update', () => {
 	if (captureTime !== undefined && !hideHud) {
 		drawText(`~r~Time Until Captured ~y~${millisToMinutesAndSeconds(captureTime - Date.now())}s`, 0.5, 0.05, 0.5, 255, 255, 255, 100);
 	}
+
+	// Switch Players While Spectating
+	if (currentlySpectating !== false) {
+		if (native.isControlJustPressed(0, 24)) {
+			let firstPlayer = aliveTeamMembers.shift();
+			aliveTeamMembers.push(firstPlayer);
+
+			if (aliveTeamMembers.length >= 1) {
+				native.requestCollisionAtCoord(alt.Player.local.pos.x, alt.Player.local.pos.y, alt.Player.local.pos.z)
+				native.networkSetInSpectatorMode(true, aliveTeamMembers[0].scriptID);
+			}
+		}
+
+		if (aliveTeamMembers[0] !== undefined) {
+			drawText('Spectating', 0.5, 0.2, 0.5, 255, 255, 255, 100);
+			drawText(`${aliveTeamMembers[0].name}`, 0.5, 0.25, 0.5, 255, 255, 255, 100);
+		}
+	}
+
+	// Display Kill Feed
+	if (killFeedList.length >= 1) {
+		killFeedList.forEach((killDetails, index) => {
+			if (killDetails.team === 'red') {
+				drawText(`~r~${killDetails.victim.name}~w~ was killed by ~b~${killDetails.attacker.name}`, 0.85, 0.05 + (0.05 * index), 0.5, 255, 255, 255, 250 - (index * 50));
+			} else {
+				drawText(`~b~${killDetails.victim.name}~w~ was killed by ~r~${killDetails.attacker.name}`, 0.85, 0.05 + (0.05 * index), 0.5, 255, 255, 255, 250 - (index * 50));
+			}
+		});
+	}
+
+	// Draw Name Tags
+	if (aliveTeamMembers.length >= 1) {
+		aliveTeamMembers.forEach((member) => {
+			if (member === alt.Player.local)
+				return;
+
+			const pos = alt.Player.local.pos;
+			const targetPos = member.pos;
+
+			if (Distance(pos, targetPos) <= 20) {
+				let [_result, _x, _y] = native.getScreenCoordFromWorldCoord(targetPos.x, targetPos.y, targetPos.z + 1.25, undefined, undefined)
+				
+				if (_result) {
+					_y -= 0.4 * (0.005 * (screenRes[2] / 1080));
+
+					drawText(`${member.name}`, _x, _y, 0.4, 255, 255, 255, 150);
+				}
+			}
+		});
+	}
+
+	// Update Blip Positions
+	if (!updatingTeamMembers && aliveTeamBlips.length >= 1) {
+		aliveTeamBlips.forEach((memberInfo) => {
+			memberInfo.blip.position = [memberInfo.member.pos.x, memberInfo.member.pos.y, memberInfo.member.pos.z];
+		});
+	}
 });
 
+// Requests player models if they're not available yet.
 function loadModels(modelNames) {
 	if (!Array.isArray(modelNames))
 		return;
@@ -82,7 +152,11 @@ function loadModels(modelNames) {
 	});
 }
 
+// Show the choose weapon screen.
 function chooseWeapons() {
+	native.doScreenFadeIn(1000);
+	currentlySpectating = false;
+	native.networkSetInSpectatorMode(false, alt.Player.local.scriptID);
 	disablePlayerControls(true);
 	setupCamera(capturePointCoords);
 	
@@ -102,8 +176,10 @@ function showCapturePoint(coords) {
 	coords.z = coords.z - 1;
 	capturePointCoords = coords;
 
-	if (capturePointBlip !== undefined)
+	if (capturePointBlip !== undefined) {
+		capturePointBlip.position = [coords.x, coords.y, coords.z]
 		return;
+	}
 
 	capturePointBlip = new alt.PointBlip(coords.x, coords.y, coords.z);
 	capturePointBlip.sprite = 38;
@@ -112,6 +188,7 @@ function showCapturePoint(coords) {
 
 // Weapons selected from the webview.
 function selectWeapons(weaponHashes) {
+	currentlySpectating = false;
 	alt.emitServer('loadWeapons', weaponHashes);
 
 	chooseWeaponView.off('loadWeapons', selectWeapons);
@@ -145,6 +222,7 @@ function setRoundTime(newRoundTime, newRoundModifier) {
 	playAudio('roundstart');
 }
 
+// Set the end time for the capture point.
 function currentCaptureTime(timeInMS) {
 	if (timeInMS === undefined || timeInMS === null) {
 		captureTime = undefined;
@@ -160,7 +238,9 @@ function currentCaptureTime(timeInMS) {
 	}
 }
 
+// Setup a camera that points at the capture point.
 function setupCamera(camPos) {
+	currentlySpectating = false;
 	if (camPos === undefined)
 		return;
 	
@@ -169,16 +249,80 @@ function setupCamera(camPos) {
 	native.renderScriptCams(true, false, 0, true, false);
 }
 
+// Clear any special cameras.
 function clearCamera() {
 	specialCam = undefined;
 	native.destroyAllCams(false);
 	native.renderScriptCams(false, false, 0, false, false);
 }
 
+// Play audio through the webview.
 function playAudio(audioName) {
 	audioPlayer.emit('playAudio', audioName);
 }
 
+// Update alive team members for nametags, and blips.
+function setAliveTeamMembers(players, teamColor) {
+	aliveTeamMembers = players;
+	currentTeamColor = teamColor;
+
+	if (updatingTeamMembers)
+		return;
+
+	updatingTeamMembers = true;
+	if (aliveTeamBlips.length >= 1) {
+		while(aliveTeamBlips.length >= 1) {
+			var data = aliveTeamBlips.pop();
+
+			if (data.blip !== undefined) {
+				data.blip.destroy();
+			}
+		}
+	}
+ 
+	alt.log('created first round of blips.');
+
+	aliveTeamMembers.forEach((member) => {
+		let newBlip = new alt.PointBlip(member.pos.x, member.pos.y, member.pos.z);
+		newBlip.sprite = 1;
+
+		if (teamColor === 'red') {
+			newBlip.color = 1;
+		} else {
+			newBlip.color = 3;
+		}
+		
+		aliveTeamBlips.push({member, blip: newBlip});
+	});
+	updatingTeamMembers = false;
+}
+
+// Enabled spectator mode.
+function enableSpectateMode() {
+	currentlySpectating = true;
+	native.doScreenFadeOut(1000);
+
+	alt.setTimeout(() => {
+		// Requires request collision at coord; to show the players.
+		native.requestCollisionAtCoord(alt.Player.local.pos.x, alt.Player.local.pos.y, alt.Player.local.pos.z)
+		native.doScreenFadeIn(1000);
+
+		if (aliveTeamMembers[0] !== undefined) {
+			native.networkSetInSpectatorMode(true, aliveTeamMembers[0].scriptID);
+		}
+	}, 3000);
+}
+
+// Display 4 Kills / Deaths
+function killFeed(victim, attacker, team) {
+	killFeedList.unshift({victim, attacker, team});
+
+	if (killFeedList.length >= 5) {
+		killFeedList.pop();
+	}
+}
+
+// Update freemode models to specific colors for blue team.
 function setBlueClothes() {
 	native.setPedComponentVariation(alt.Player.local.scriptID, 0, 0, 0, 0); // Face
 	native.setPedComponentVariation(alt.Player.local.scriptID, 1, 21, 0, 0); // Head
@@ -190,6 +334,7 @@ function setBlueClothes() {
 	native.setPedComponentVariation(alt.Player.local.scriptID, 11, 14, 0, 0); // Top
 }
 
+// Update freemode models to specific colors for red team.
 function setRedClothes() {
 	native.setPedComponentVariation(alt.Player.local.scriptID, 0, 0, 0, 0); // Face
 	native.setPedComponentVariation(alt.Player.local.scriptID, 1, 26, 0, 0); // Head
@@ -201,6 +346,7 @@ function setRedClothes() {
 	native.setPedComponentVariation(alt.Player.local.scriptID, 11, 79, 0, 0); // Top
 }
 
+// Draw marker function; must be called in update function.
 function drawMarker(type, pos, scaleX, scaleY, scaleZ, r, g, b, a) {
 	native.drawMarker(
 		type, // type
@@ -230,6 +376,7 @@ function drawMarker(type, pos, scaleX, scaleY, scaleZ, r, g, b, a) {
 	);
 }
 
+// Get distance between two points.
 function Distance(vector1, vector2) {
 	if (vector1 === undefined || vector2 === undefined) {
 		throw new Error('AddVector => vector1 or vector2 is undefined');
@@ -237,6 +384,7 @@ function Distance(vector1, vector2) {
 	return Math.sqrt(Math.pow(vector1.x - vector2.x, 2) + Math.pow(vector1.y - vector2.y, 2) + Math.pow(vector1.z - vector2.z, 2));
 }
 
+// Draw text; must be called in update function.
 function drawText(msg, x, y, scale, r, g, b, a) {
 	native.setUiLayer(50);
 	native.beginTextCommandDisplayText('STRING');
@@ -250,12 +398,9 @@ function drawText(msg, x, y, scale, r, g, b, a) {
 	native.endTextCommandDisplayText(x, y)
 }
 
+// Calculate milliseconds to minutes; and display as string.
 function millisToMinutesAndSeconds(millis) {
 	var minutes = Math.floor(millis / 60000);
 	var seconds = ((millis % 60000) / 1000).toFixed(0);
 	return minutes + ":" + (seconds < 10 ? '0' : '') + seconds;
-}
-
-function vehicleDoesSomething() {
-	
 }

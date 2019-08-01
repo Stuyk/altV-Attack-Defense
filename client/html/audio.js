@@ -1,8 +1,8 @@
 var ready = false;
 
 window.addEventListener('DOMContentLoaded', (e) => {
-	console.log('audio player ready');
 	ready = true;
+	document.getElementById('clickMe').click();
 });
 
 function playAudio(name) {
