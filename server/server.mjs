@@ -109,6 +109,7 @@ var capturePointShape = new alt.ColshapeCylinder(capturePoint.x, capturePoint.y,
 
 // Called on first join.
 alt.on('playerConnect', (player) => {
+	console.log(`${player.name} ==> has joined the server.`)
 	chat.broadcast(`${player.name} has joined the server.`);
 	player.setDateTime(1, 1, 1, 12, 0, 0);
 	player.setWeather(8);
@@ -120,6 +121,7 @@ alt.on('playerConnect', (player) => {
 
 // When the player leaves we remove them from the team.
 alt.on('playerDisconnect', (player) => {
+	console.log(`${player.name} ==> has left the server.`)
 	removeFromTeam(player);
 });
 
@@ -166,6 +168,10 @@ alt.on('chatIntercept', (player, msg) => {
 // ushort actualDamage = 65536 - damage;
 alt.on('playerDamage', (victim, attacker, damage, weapon) => {
 	const actualDamage = 65536 - damage;
+	if (attacker === null) {
+		return;
+	}
+
 	if (victim.constructor.name !== "Player" || attacker.constructor.name !== "Player") {
 		return;
 	}
