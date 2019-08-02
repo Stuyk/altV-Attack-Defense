@@ -16,7 +16,8 @@ var currentlySpectating = false;
 var killFeedList = [];
 var updatingTeamMembers = false;
 var currentTeamColor = 'red';
-var winscreen = undefined;
+var redWinscreen = undefined;
+var blueWinscreen = undefined;
 
 const screenRes = native.getActiveScreenResolution(0, 0);
 
@@ -103,9 +104,9 @@ alt.on('update', () => {
 	if (killFeedList.length >= 1) {
 		killFeedList.forEach((killDetails, index) => {
 			if (killDetails.team === 'red') {
-				drawText(`~r~${killDetails.victim.name}~w~ was killed by ~b~${killDetails.attacker.name}`, 0.85, 0.05 + (0.05 * index), 0.5, 255, 255, 255, 250 - (index * 50));
+				drawText(`~r~${killDetails.victim}~w~ was killed by ~b~${killDetails.attacker}`, 0.85, 0.05 + (0.05 * index), 0.5, 255, 255, 255, 250 - (index * 50));
 			} else {
-				drawText(`~b~${killDetails.victim.name}~w~ was killed by ~r~${killDetails.attacker.name}`, 0.85, 0.05 + (0.05 * index), 0.5, 255, 255, 255, 250 - (index * 50));
+				drawText(`~b~${killDetails.victim}~w~ was killed by ~r~${killDetails.attacker}`, 0.85, 0.05 + (0.05 * index), 0.5, 255, 255, 255, 250 - (index * 50));
 			}
 		});
 	}
@@ -156,9 +157,14 @@ function loadModels(modelNames) {
 
 // Show the choose weapon screen.
 function chooseWeapons() {
-	if (winscreen !== undefined) {
-		winscreen.destroy();
-		winscreen = undefined;
+	if (redWinscreen !== undefined) {
+		redWinscreen.destroy();
+		redWinscreen = undefined;
+	}
+
+	if (blueWinscreen !== undefined) {
+		blueWinscreen.destroy();
+		blueWinscreen = undefined;
 	}
 
 	native.doScreenFadeIn(1000);
@@ -332,9 +338,9 @@ function killFeed(victim, attacker, team) {
 // Show the win screen
 function showWinScreen(team) {
 	if (team === 'red') {
-		winscreen = new alt.WebView('http://resources/attack-defend/client/html/redwins.html');
+		redWinscreen = new alt.WebView('http://resources/attack-defend/client/html/redwins.html');
 	} else {
-		winscreen = new alt.WebView('http://resources/attack-defend/client/html/bluewins.html');
+		blueWinscreen = new alt.WebView('http://resources/attack-defend/client/html/bluewins.html');
 	}
 }
 

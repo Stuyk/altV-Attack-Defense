@@ -22,6 +22,7 @@ var unassignedPlayers = []; // Players who die are assigned to this array.
 var captureEnterTime = undefined; // The time when the player enters the capture point.
 var roundStartTime = Date.now(); // Set the round start time; changes frequently.
 var roundTimeModifier = 300000; // 5 Minutes
+var restartingRound = false;
 
 // Current Maps
 var captureRotation = [
@@ -35,18 +36,6 @@ var captureRotation = [
 			x: 284.05712890625, 
 			y: -3160.918701171875, 
 			z: 5.791259765625 
-		}
-	},
-	{ // Ship Point
-		capturePoint: {
-			x: -115.68791198730469,
-			y: -2366.32080078125,
-			z: 13.778076171875 
-		},
-		redTeamSpawn: {
-			x: -280.4175720214844,
-			y: -2411.472412109375,
-			z: 5.993408203125
 		}
 	}, // Plaza
 	{
@@ -139,26 +128,32 @@ alt.on('playerDeath', (victim, attacker, weapon) => {
 	unassignedPlayers.push(victim);
 	removeFromTeam(victim);
 
+	if (attacker !== null && attacker.constructor.name === "Player") {
+		alt.emitClient(attacker, 'playAudio', 'playerkill');
+	}
+
+	if (victim.constructor.name === "Player" && attacker !== null && attacker.constructor.name === "Player") {
+		alt.emitClient(null, 'killFeed', victim.name, attacker.name, victim.team);
+		alt.emitClient(victim, 'enableSpectateMode');
+	}
+
 	// Red Team Dies
 	if (redTeam.length <= 0) {
 		resetRound();
 		alt.emitClient(null, 'showWinScreen', 'blue');
 		chat.broadcast(`Blue team has won the round.`);
 		alt.emitClient(null, 'playAudio', 'bluewins');
-	// Blue Team Dies
-	} else if(blueTeam.length <= 0) {
+		return;
+	
+	}
+	
+	if (blueTeam.length <= 0) {
 		resetRound();
 		alt.emitClient(null, 'showWinScreen', 'red');
 		chat.broadcast(`Red team has won the round.`);
 		alt.emitClient(null, 'playAudio', 'redwins');
+		return;
 	}
-
-	if (attacker !== undefined || attacker !== null) {
-		alt.emitClient(attacker, 'playAudio', 'playerkill');
-	}
-
-	alt.emitClient(victim, 'enableSpectateMode');
-	alt.emitClient(null, 'killFeed', victim, attacker, victim.team);
 });
 
 alt.on('chatIntercept', (player, msg) => {
@@ -171,7 +166,11 @@ alt.on('chatIntercept', (player, msg) => {
 // ushort actualDamage = 65536 - damage;
 alt.on('playerDamage', (victim, attacker, damage, weapon) => {
 	const actualDamage = 65536 - damage;
-	if (attacker.team === null || attacker.team === undefined) {
+	if (victim.constructor.name !== "Player" || attacker.constructor.name !== "Player") {
+		return;
+	}
+	
+	if (attacker.team === undefined) {
 		return;
 	}
 	
@@ -280,7 +279,7 @@ function addToTeam(player) {
  * @param player 
  */
 function removeFromTeam(player) {
-	if (player.pos !== undefined) {
+	if (player.constructor.name === "Player") {
 		if (player.team === 'red') {
 			var pos = utility.RandomPosAround(redTeamSpawn, 3);
 			player.pos = pos;
@@ -339,7 +338,7 @@ function handleBlueSpawn(player) {
 function updateTeams() {
 	if (redTeam.length >= 1) {
 		redTeam.forEach((redMember) => {
-			if(redMember === undefined || redMember === null)
+			if (redMember.constructor.name !== "Player")
 				return;
 	
 			alt.emitClient(redMember, 'setTeamMembers', redTeam);
@@ -348,7 +347,7 @@ function updateTeams() {
 
 	if (blueTeam.length >= 1) {
 		blueTeam.forEach((blueMember) => {
-			if (blueMember === undefined || blueMember === null)
+			if (blueMember.constructor.name !== "Player")
 				return;
 	
 			alt.emitClient(blueMember, 'setTeamMembers', blueTeam);
@@ -356,6 +355,9 @@ function updateTeams() {
 	}
 
 	unassignedPlayers.forEach((player) => {
+		if (player.constructor.name !== "Player")
+			return;
+		
 		if (player.team === 'red') {
 			alt.emitClient(player, 'aliveTeamMembers', redTeam, 'red');
 		} else {
@@ -371,10 +373,16 @@ function updateTeams() {
  */
 function updateAlivePlayers() {
 	blueTeam.forEach((player) => {
+		if (player.constructor.name !== "Player")
+			return;
+		
 		alt.emitClient(player, 'aliveTeamMembers', blueTeam, 'blue');
 	});
 
 	redTeam.forEach((player) => {
+		if (player.constructor.name !== "Player")
+			return;
+		
 		alt.emitClient(player, 'aliveTeamMembers', redTeam, 'red');
 	});
 }
@@ -398,6 +406,11 @@ function shuffle(array) {
 
 // Called to reset the round; and start a new one.
 function resetRound() {
+	if (restartingRound)
+		return;
+
+	restartingRound = true;
+	
 	roundStartTime = undefined;
 	alt.emitClient(null, 'setRoundTime', undefined);
 	alt.emitClient(null, 'updateCaptureTime', undefined);
@@ -406,6 +419,9 @@ function resetRound() {
 	captureEnterTime = undefined;
 	
 	alt.Player.all.forEach((target) => {
+		if (target.constructor.name !== "Player")
+			return;
+		
 		removeFromTeam(target);
 	});
 
@@ -444,10 +460,14 @@ function resetRound() {
 		}
 		
 		lastShuffle.forEach((target) => {
+			if (target.constructor.name !== "Player")
+				return;
+			
 			addToTeam(target);
 		});
 
 		unassignedPlayers = [];
+		restartingRound = false;
 	}, 5000);
 }
 
@@ -475,6 +495,9 @@ setInterval(() => {
 // Weather / Date Updater
 setInterval(() => {
 	alt.Player.all.forEach((player) => {
+		if (player.constructor.name !== "Player")
+			return;
+		
 		player.setDateTime(1, 1, 1, 12, 0, 0);
 		player.setWeather(8);
 	});
@@ -493,3 +516,10 @@ setInterval(() => {
 	alt.emitClient(null, 'playAudio', 'bluewins');
 	alt.emitClient(null, 'showWinScreen', 'blue');
 }, 5000);
+
+chat.registerCmd('players', (player, arg) => {
+	chat.send(player, `{FFFF00}Players In-Game`);
+	alt.Player.all.forEach((target) => {
+		chat.send(player, `${target.name}`)
+	});
+});
