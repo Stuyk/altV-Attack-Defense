@@ -104,9 +104,9 @@ var captureRotation = [
         	z: 130.4461669921875
 		},
 		redTeamSpawn: {
-			x: 650.4132080078125,
-			y: 480.1450500488281,
-			z: 139.83154296875
+			x: 860.7042846679688,
+			y:506.6115417480469,
+			z:126.3474349975586
 		}
 	}
 ];
@@ -142,11 +142,13 @@ alt.on('playerDeath', (victim, attacker, weapon) => {
 	// Red Team Dies
 	if (redTeam.length <= 0) {
 		resetRound();
+		alt.emitClient(null, 'showWinScreen', 'blue');
 		chat.broadcast(`Blue team has won the round.`);
 		alt.emitClient(null, 'playAudio', 'bluewins');
 	// Blue Team Dies
 	} else if(blueTeam.length <= 0) {
 		resetRound();
+		alt.emitClient(null, 'showWinScreen', 'red');
 		chat.broadcast(`Red team has won the round.`);
 		alt.emitClient(null, 'playAudio', 'redwins');
 	}
@@ -377,6 +379,23 @@ function updateAlivePlayers() {
 	});
 }
 
+function shuffle(array) {
+	let counter = array.length;
+  
+	while (counter > 0) {
+	  let index = Math.floor(Math.random() * counter);
+  
+	  counter--;
+  
+	  let temp = array[counter];
+	  array[counter] = array[index];
+	  array[index] = temp;
+	}
+  
+	return array;
+}
+
+
 // Called to reset the round; and start a new one.
 function resetRound() {
 	roundStartTime = undefined;
@@ -407,17 +426,24 @@ function resetRound() {
 	redTeamSpawn = captureRotation[0].redTeamSpawn;
 	capturePoint = captureRotation[0].capturePoint;
 
-	capturePointShape.destroy();
-	capturePointShape = new alt.ColshapeCylinder(capturePoint.x, capturePoint.y, capturePoint.z - 1, 2, 5);
-
-	// Update Local Point
-	alt.emitClient(null, 'showCapturePoint', capturePoint);
-
 	// Round Reset
 	setTimeout(() => {
+		// Setup New Point
+		capturePointShape.destroy();
+		capturePointShape = new alt.ColshapeCylinder(capturePoint.x, capturePoint.y, capturePoint.z - 1, 2, 5);
+
+		// Update Local Point
+		alt.emitClient(null, 'showCapturePoint', capturePoint);
+
 		roundStartTime = Date.now();
 		alt.emitClient(null, 'setRoundTime', roundStartTime, roundTimeModifier);
-		alt.Player.all.forEach((target) => {
+		
+		var lastShuffle = alt.Player.all;
+		for(var i = 0; i < 10; i++) {
+			lastShuffle = shuffle(lastShuffle);
+		}
+		
+		lastShuffle.forEach((target) => {
 			addToTeam(target);
 		});
 
@@ -441,6 +467,7 @@ setInterval(() => {
 	}
 
 	resetRound();
+	alt.emitClient(null, 'showWinScreen', 'red');
 	alt.emitClient(null, 'playAudio', 'redwins');
 	chat.broadcast(`Red team has won the round.`);
 }, 500);
@@ -464,12 +491,5 @@ setInterval(() => {
 	resetRound();
 	chat.broadcast(`Blue team has won the round.`);
 	alt.emitClient(null, 'playAudio', 'bluewins');
+	alt.emitClient(null, 'showWinScreen', 'blue');
 }, 5000);
-
-chat.registerCmd('pos', (player) => {
-	console.log(player.pos);
-});
-
-chat.registerCmd('veh', (player) => {
-	new alt.Vehicle('infernus', player.pos.x, player.pos.y, player.pos.z, 0, 0, 0);
-});

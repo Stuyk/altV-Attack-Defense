@@ -16,6 +16,7 @@ var currentlySpectating = false;
 var killFeedList = [];
 var updatingTeamMembers = false;
 var currentTeamColor = 'red';
+var winscreen = undefined;
 
 const screenRes = native.getActiveScreenResolution(0, 0);
 
@@ -41,6 +42,7 @@ alt.onServer('setRedClothes', setRedClothes); // Set the red player team clothes
 alt.onServer('aliveTeamMembers', setAliveTeamMembers); // Set the alive players for a team.
 alt.onServer('enableSpectateMode', enableSpectateMode); // Enable spectator mode.
 alt.onServer('killFeed', killFeed); // Push kills and deaths to the kill feed.
+alt.onServer('showWinScreen', showWinScreen);
 
 // Disconnect Event
 alt.on('disconnect', () => {
@@ -59,7 +61,7 @@ alt.on('update', () => {
 
 	// Draw a marker at the position of the capture point.
 	if (capturePointCoords !== undefined) {
-		drawMarker(1, capturePointCoords, 2, 2, 0.5, 0, 128, 255, 100);
+		drawMarker(1, capturePointCoords, 2, 2, 2, 0, 128, 255, 100);
 	}
 
 	// Disable player controls.
@@ -154,6 +156,11 @@ function loadModels(modelNames) {
 
 // Show the choose weapon screen.
 function chooseWeapons() {
+	if (winscreen !== undefined) {
+		winscreen.destroy();
+		winscreen = undefined;
+	}
+
 	native.doScreenFadeIn(1000);
 	currentlySpectating = false;
 	native.networkSetInSpectatorMode(false, alt.Player.local.scriptID);
@@ -319,6 +326,15 @@ function killFeed(victim, attacker, team) {
 
 	if (killFeedList.length >= 5) {
 		killFeedList.pop();
+	}
+}
+
+// Show the win screen
+function showWinScreen(team) {
+	if (team === 'red') {
+		winscreen = new alt.WebView('http://resources/attack-defend/client/html/redwins.html');
+	} else {
+		winscreen = new alt.WebView('http://resources/attack-defend/client/html/bluewins.html');
 	}
 }
 
