@@ -2,7 +2,12 @@
 
 Remember to 🌟 this Github if you 💖 it.
 
-This resource is currently incomplete.
+### Rules
+* 5 Minutes for Attackers to Capture the Point
+* Blue / Red can win by eliminating the opposing team.
+* Red team can capture the point in 15 seconds.
+* Choose two weapons per round.
+* Team blips, kill feed, point location on map, etc.
 
 You can view the work being done on https://twitch.tv/stuykgaming
 
