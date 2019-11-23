@@ -26,7 +26,7 @@ var captureAudioPlayed = false;
 
 // Audio Player Webview
 // Required to focus/unfocus.
-const audioPlayer = new alt.WebView('http://resources/attack-defend/client/html/audioplayer.html');
+const audioPlayer = new alt.WebView('http://resource/client/html/audioplayer.html');
 audioPlayer.focus();
 audioPlayer.unfocus();
 
@@ -56,7 +56,7 @@ alt.on('disconnect', () => {
 });
 
 // Constantly Called Drawables and Functions.
-alt.on('update', () => {
+alt.everyTick(function () {
 	// Restore Stamina
 	native.restorePlayerStamina(alt.Player.local.scriptID, 100);
 
@@ -67,7 +67,7 @@ alt.on('update', () => {
 
 	// Disable player controls.
 	if (disableControls) {
-		for(var i = 0; i < 3; i++) {
+		for (var i = 0; i < 3; i++) {
 			native.disableAllControlActions(i);
 		}
 	}
@@ -122,7 +122,7 @@ alt.on('update', () => {
 
 			if (Distance(pos, targetPos) <= 20) {
 				let [_result, _x, _y] = native.getScreenCoordFromWorldCoord(targetPos.x, targetPos.y, targetPos.z + 1.25, undefined, undefined)
-				
+
 				if (_result) {
 					_y -= 0.4 * (0.005 * (screenRes[2] / 1080));
 
@@ -172,12 +172,12 @@ function chooseWeapons() {
 	native.networkSetInSpectatorMode(false, alt.Player.local.scriptID);
 	disablePlayerControls(true);
 	setupCamera(capturePointCoords);
-	
+
 	if (chooseWeaponView === undefined || chooseWeaponView === null) {
 		native.transitionToBlurred(1000);
 		native.displayRadar(false);
 
-		chooseWeaponView = new alt.WebView('http://resources/attack-defend/client/html/index.html');
+		chooseWeaponView = new alt.WebView('http://resource/client/html/index.html');
 		chooseWeaponView.focus();
 		chooseWeaponView.on('loadWeapons', selectWeapons);
 		alt.showCursor(true);
@@ -206,7 +206,7 @@ function selectWeapons(weaponHashes) {
 
 	chooseWeaponView.off('loadWeapons', selectWeapons);
 	chooseWeaponView.destroy();
-	
+
 	alt.showCursor(false);
 	chooseWeaponView = undefined;
 	disablePlayerControls(false);
@@ -256,7 +256,7 @@ function setupCamera(camPos) {
 	currentlySpectating = false;
 	if (camPos === undefined)
 		return;
-	
+
 	specialCam = native.createCamWithParams("DEFAULT_SCRIPTED_CAMERA", camPos.x + 3, camPos.y + 3, camPos.z + 5, 0, 0, 0, 90, true, 0);
 	native.pointCamAtCoord(specialCam, camPos.x, camPos.y, camPos.z)
 	native.renderScriptCams(true, false, 0, true, false);
@@ -284,7 +284,7 @@ function setAliveTeamMembers(players, teamColor) {
 
 	updatingTeamMembers = true;
 	if (aliveTeamBlips.length >= 1) {
-		while(aliveTeamBlips.length >= 1) {
+		while (aliveTeamBlips.length >= 1) {
 			var data = aliveTeamBlips.pop();
 
 			if (data.blip !== undefined) {
@@ -292,7 +292,7 @@ function setAliveTeamMembers(players, teamColor) {
 			}
 		}
 	}
- 
+
 	alt.log('created first round of blips.');
 
 	aliveTeamMembers.forEach((member) => {
@@ -304,8 +304,8 @@ function setAliveTeamMembers(players, teamColor) {
 		} else {
 			newBlip.color = 3;
 		}
-		
-		aliveTeamBlips.push({member, blip: newBlip});
+
+		aliveTeamBlips.push({ member, blip: newBlip });
 	});
 	updatingTeamMembers = false;
 }
@@ -328,7 +328,7 @@ function enableSpectateMode() {
 
 // Display 4 Kills / Deaths
 function killFeed(victim, attacker, team) {
-	killFeedList.unshift({victim, attacker, team});
+	killFeedList.unshift({ victim, attacker, team });
 
 	if (killFeedList.length >= 5) {
 		killFeedList.pop();
@@ -338,9 +338,9 @@ function killFeed(victim, attacker, team) {
 // Show the win screen
 function showWinScreen(team) {
 	if (team === 'red') {
-		redWinscreen = new alt.WebView('http://resources/attack-defend/client/html/redwins.html');
+		redWinscreen = new alt.WebView('http://resource/client/html/redwins.html');
 	} else {
-		blueWinscreen = new alt.WebView('http://resources/attack-defend/client/html/bluewins.html');
+		blueWinscreen = new alt.WebView('http://resource/client/html/bluewins.html');
 	}
 }
 
@@ -408,7 +408,7 @@ function Distance(vector1, vector2) {
 
 // Draw text; must be called in update function.
 function drawText(msg, x, y, scale, r, g, b, a) {
-	native.setUiLayer(50);
+	native.setScriptGfxDrawOrder(50);
 	native.beginTextCommandDisplayText('STRING');
 	native.addTextComponentSubstringPlayerName(msg);
 	native.setTextFont(4);
